@@ -226,6 +226,11 @@ inline void CPU::Push(uint8_t value)
 {
 }
 
+inline uint16_t CPU::Pull16()
+{
+	return uint16_t();
+}
+
 inline uint8_t CPU::Pull()
 {
 	return uint8_t();
@@ -657,6 +662,25 @@ void CPU::ROR()
 		SetZN(value);
 		m_RAM->Write(m_Address, value);
 	}
+}
+
+// RTI - Return from interrupt
+void CPU::RTI()
+{
+	m_P = Pull() & 0xCF;
+	m_PC = Pull16();
+}
+
+// RTS - Return from subroutine
+void CPU::RTS()
+{
+	m_PC = Pull16() + 1;
+}
+
+// SBC - Subtract with carry
+void CPU::SBC()
+{
+
 }
 
 END_NES_EMULATOR_NAMESPACE

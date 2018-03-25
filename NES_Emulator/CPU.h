@@ -26,6 +26,8 @@ private:
 
 	inline void Push(uint8_t value);
 
+	inline uint16_t Pull16();
+
 	inline uint8_t Pull();
 
 	inline void SetZ(uint8_t value);
@@ -121,6 +123,12 @@ private:
 	void ROL();
 
 	void ROR();
+
+	void RTI();
+
+	void RTS();
+
+	void SBC();
 
 	enum class AddressingMode
 	{
