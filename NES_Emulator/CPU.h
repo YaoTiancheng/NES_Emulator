@@ -130,6 +130,32 @@ private:
 
 	void SBC();
 
+	void SEC();
+
+	void SED();
+
+	void SEI();
+
+	void STA();
+
+	void STX();
+
+	void STY();
+
+	void TAX();
+
+	void TAY();
+
+	void TSX();
+
+	void TXA();
+
+	void TXS();
+
+	void TYA();
+
+	void INV();
+
 	enum class AddressingMode
 	{
 		Absolute = 1,

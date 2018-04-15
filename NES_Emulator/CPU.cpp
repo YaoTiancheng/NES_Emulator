@@ -93,7 +93,39 @@ inline bool ArePageDifferent(uint16_t address1, uint16_t address2)
 }
 
 CPU::CPU()
-	: m_kExecutionTable{ &CPU::PHP }
+	: m_kExecutionTable {
+	&CPU::BRK, &CPU::ORA, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::ORA, &CPU::ASL, &CPU::INV,
+	&CPU::PHP, &CPU::ORA, &CPU::ASL, &CPU::INV, &CPU::NOP, &CPU::ORA, &CPU::ASL, &CPU::INV,
+	&CPU::BPL, &CPU::ORA, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::ORA, &CPU::ASL, &CPU::INV,
+	&CPU::CLC, &CPU::ORA, &CPU::NOP, &CPU::INV, &CPU::NOP, &CPU::ORA, &CPU::ASL, &CPU::INV,
+	&CPU::JSR, &CPU::AND, &CPU::INV, &CPU::INV, &CPU::BIT, &CPU::AND, &CPU::ROL, &CPU::INV,
+	&CPU::PLP, &CPU::AND, &CPU::ROL, &CPU::INV, &CPU::BIT, &CPU::AND, &CPU::ROL, &CPU::INV,
+	&CPU::BMI, &CPU::AND, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::AND, &CPU::ROL, &CPU::INV,
+	&CPU::SEC, &CPU::AND, &CPU::NOP, &CPU::INV, &CPU::NOP, &CPU::AND, &CPU::ROL, &CPU::INV,
+	&CPU::RTI, &CPU::EOR, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::EOR, &CPU::LSR, &CPU::INV,
+	&CPU::PHA, &CPU::EOR, &CPU::LSR, &CPU::INV, &CPU::JMP, &CPU::EOR, &CPU::LSR, &CPU::INV,
+	&CPU::BVC, &CPU::EOR, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::EOR, &CPU::LSR, &CPU::INV,
+	&CPU::CLI, &CPU::EOR, &CPU::NOP, &CPU::INV, &CPU::NOP, &CPU::EOR, &CPU::LSR, &CPU::INV,
+	&CPU::RTS, &CPU::ADC, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::ADC, &CPU::ROR, &CPU::INV,
+	&CPU::PLA, &CPU::ADC, &CPU::ROR, &CPU::INV, &CPU::JMP, &CPU::ADC, &CPU::ROR, &CPU::INV,
+	&CPU::BVS, &CPU::ADC, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::ADC, &CPU::ROR, &CPU::INV,
+	&CPU::SEI, &CPU::ADC, &CPU::NOP, &CPU::INV, &CPU::NOP, &CPU::ADC, &CPU::ROR, &CPU::INV,
+	&CPU::NOP, &CPU::STA, &CPU::NOP, &CPU::INV, &CPU::STY, &CPU::STA, &CPU::STX, &CPU::INV,
+	&CPU::DEY, &CPU::NOP, &CPU::TXA, &CPU::INV, &CPU::STY, &CPU::STA, &CPU::STX, &CPU::INV,
+	&CPU::BCC, &CPU::STA, &CPU::INV, &CPU::INV, &CPU::STY, &CPU::STA, &CPU::STX, &CPU::INV,
+	&CPU::TYA, &CPU::STA, &CPU::TXS, &CPU::INV, &CPU::INV, &CPU::STA, &CPU::INV, &CPU::INV,
+	&CPU::LDY, &CPU::LDA, &CPU::LDX, &CPU::INV, &CPU::LDY, &CPU::LDA, &CPU::LDX, &CPU::INV,
+	&CPU::TAY, &CPU::LDA, &CPU::TAX, &CPU::INV, &CPU::LDY, &CPU::LDA, &CPU::LDX, &CPU::INV,
+	&CPU::BCS, &CPU::LDA, &CPU::INV, &CPU::INV, &CPU::LDY, &CPU::LDA, &CPU::LDX, &CPU::INV,
+	&CPU::CLV, &CPU::LDA, &CPU::TSX, &CPU::INV, &CPU::LDY, &CPU::LDA, &CPU::LDX, &CPU::INV,
+	&CPU::CPY, &CPU::CMP, &CPU::NOP, &CPU::INV, &CPU::CPY, &CPU::CMP, &CPU::DEC, &CPU::INV,
+	&CPU::INY, &CPU::CMP, &CPU::DEX, &CPU::INV, &CPU::CPY, &CPU::CMP, &CPU::DEC, &CPU::INV,
+	&CPU::BNE, &CPU::CMP, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::CMP, &CPU::DEC, &CPU::INV,
+	&CPU::CLD, &CPU::CMP, &CPU::NOP, &CPU::INV, &CPU::NOP, &CPU::CMP, &CPU::DEC, &CPU::INV,
+	&CPU::CPX, &CPU::SBC, &CPU::NOP, &CPU::INV, &CPU::CPX, &CPU::SBC, &CPU::INC, &CPU::INV,
+	&CPU::INX, &CPU::SBC, &CPU::NOP, &CPU::SBC, &CPU::CPX, &CPU::SBC, &CPU::INC, &CPU::INV,
+	&CPU::BEQ, &CPU::SBC, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::SBC, &CPU::INC, &CPU::INV,
+	&CPU::SED, &CPU::SBC, &CPU::NOP, &CPU::INV, &CPU::NOP, &CPU::SBC, &CPU::INC, &CPU::INV }
 {
 }
 
@@ -210,30 +242,44 @@ void CPU::AddBranchCycles()
 
 uint16_t CPU::Read16(uint16_t address) const
 {
-	return uint16_t();
+	uint8_t lo = m_RAM->Read(m_Address);
+	uint8_t hi = m_RAM->Read(m_Address + 1);
+	return uint16_t(hi) << 8 | lo;
 }
 
 uint16_t CPU::Read16Bug(uint16_t address) const
 {
-	return uint16_t();
+	uint8_t lo = m_RAM->Read(m_Address);
+	uint8_t hi = m_RAM->Read(m_Address & 0xFF00 | uint8_t(m_Address) + 1);
+	return uint16_t(hi) << 8 | lo;
 }
 
 inline void CPU::Push16(uint16_t value)
 {
+	uint8_t hi = value >> 8;
+	uint8_t lo = value & 0xFF;
+	Push(hi);
+	Push(lo);
 }
 
 inline void CPU::Push(uint8_t value)
 {
+	m_RAM->Write(0x0100 | m_SP, value);
+	m_SP--;
 }
 
 inline uint16_t CPU::Pull16()
 {
-	return uint16_t();
+	uint8_t lo = Pull();
+	uint8_t hi = Pull();
+	return uint16_t(hi) << 8 | lo;
 }
 
 inline uint8_t CPU::Pull()
 {
-	return uint8_t();
+	uint8_t value = m_RAM->Read(0x0100 | m_SP);
+	m_SP++;
+	return value;
 }
 
 inline void CPU::SetZ(uint8_t value)
@@ -259,7 +305,7 @@ void CPU::Compare(uint8_t a, uint8_t b)
 	// Set carry bit and subtract
 	uint16_t sub = (a | 0x0100) - b;
 	SetZN(uint8_t(sub));
-	m_P = m_P & 0xFE | (sub & 0x0100) >> 8;
+	m_P = m_P & 0xFE | sub >> 8;
 }
 
 void CPU::NMIInterrupt()
@@ -680,8 +726,101 @@ void CPU::RTS()
 // SBC - Subtract with carry
 void CPU::SBC()
 {
-
+	// Copy accumulator value and set bit 8
+	uint16_t a = m_A | 0x0100;
+	uint16_t b = m_RAM->Read(m_Address);
+	uint16_t c = m_P & 0x01;
+	uint16_t sub = a - b - (1 - c);
+	m_A = uint8_t(sub);
+	SetZN(m_A);
+	// Set carry flag if sum results a carry
+	m_P = m_P & ~0x01 | sub >> 8;
+	// Set overflow flag if sum results an overflow
+	m_P = m_P & ~0x40 | ((~(a ^ b)) & (a ^ c) & 0x80u) >> 1;
 }
+
+// SEC - Set carry flag
+void CPU::SEC()
+{
+	m_P |= 0x01;
+}
+
+// SED - Set decimal flag
+void CPU::SED()
+{
+	m_P |= 0x08;
+}
+
+// SEI - Set interrupt flag
+void CPU::SEI()
+{
+	m_P |= 0x04;
+}
+
+// STA - Store accumulator
+void CPU::STA()
+{
+	m_RAM->Write(m_Address, m_A);
+}
+
+// STX - Store register X
+void CPU::STX()
+{
+	m_RAM->Write(m_Address, m_X);
+}
+
+// STY - Store register Y
+void CPU::STY()
+{
+	m_RAM->Write(m_Address, m_Y);
+}
+
+// TAX - Transfer accumulator to register X
+void CPU::TAX()
+{
+	m_X = m_A;
+	SetZN(m_X);
+}
+
+// TAY - Transfer accumulator to register Y
+void CPU::TAY()
+{
+	m_Y = m_A;
+	SetZN(m_Y);
+}
+
+// TSX - Transfer stack pointer to X
+void CPU::TSX()
+{
+	m_X = m_SP;
+	SetZN(m_X);
+}
+
+// TXA - Transfer register X to accumulator
+void CPU::TXA()
+{
+	m_A = m_X;
+	SetZN(m_A);
+}
+
+// TXS - Transfer register X to stack pointer
+void CPU::TXS()
+{
+	m_SP = m_X;
+}
+
+// TYA - Transfer register Y to accumulator
+void CPU::TYA()
+{
+	m_A = m_Y;
+	SetZN(m_A);
+}
+
+// INV - Invalid instruction
+void CPU::INV()
+{
+}
+
 
 END_NES_EMULATOR_NAMESPACE
 
