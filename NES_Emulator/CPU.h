@@ -8,200 +8,200 @@ class CPU
 {
 public:
 
-	static const uint32_t kMaxStatusStrLength = 256;
+    static const uint32_t kMaxStatusStrLength = 256;
 
-	CPU(Console* console);
+    CPU(Console* console);
 
-	bool Step(char* statusStr = nullptr);
+    bool Step(char* statusStr = nullptr);
 
-	void Init(uint16_t PC);
+    void Init(uint16_t PC);
 
-	void GetStatusStr(char* str) const;
+    void GetStatusStr(char* str) const;
 
-	void FetchNextOpCode();
+    void FetchNextOpCode();
 
 private:
 
-	void AddBranchCycles();
+    void AddBranchCycles();
 
-	uint16_t Read16(uint16_t address) const;
+    uint16_t Read16(uint16_t address) const;
 
-	uint16_t Read16Bug(uint16_t address) const;
+    uint16_t Read16Bug(uint16_t address) const;
 
-	inline void Push16(uint16_t value);
+    inline void Push16(uint16_t value);
 
-	inline void Push(uint8_t value);
+    inline void Push(uint8_t value);
 
-	inline uint16_t Pull16();
+    inline uint16_t Pull16();
 
-	inline uint8_t Pull();
+    inline uint8_t Pull();
 
-	inline void SetZ(uint8_t value);
+    inline void SetZ(uint8_t value);
 
-	inline void SetN(uint8_t value);
+    inline void SetN(uint8_t value);
 
-	inline void SetZN(uint8_t value);
+    inline void SetZN(uint8_t value);
 
-	void Compare(uint8_t a, uint8_t b);
+    void Compare(uint8_t a, uint8_t b);
 
-	void NMIInterrupt();
+    void NMIInterrupt();
 
-	void IRQInterrupt();
+    void IRQInterrupt();
 
-	void ADC();
+    void ADC();
 
-	void AND();
+    void AND();
 
-	void ASL();
+    void ASL();
 
-	void BCC();
+    void BCC();
 
-	void BCS();
+    void BCS();
 
-	void BEQ();
+    void BEQ();
 
-	void BIT();
+    void BIT();
 
-	void BMI();
+    void BMI();
 
-	void BNE();
+    void BNE();
 
-	void BPL();
+    void BPL();
 
-	void BRK();
+    void BRK();
 
-	void BVC();
+    void BVC();
 
-	void BVS();
+    void BVS();
 
-	void CLC();
+    void CLC();
 
-	void CLD();
+    void CLD();
 
-	void CLI();
+    void CLI();
 
-	void CLV();
+    void CLV();
 
-	void CMP();
+    void CMP();
 
-	void CPX();
+    void CPX();
 
-	void CPY();
+    void CPY();
 
-	void DEC();
+    void DEC();
 
-	void DEX();
+    void DEX();
 
-	void DEY();
+    void DEY();
 
-	void EOR();
+    void EOR();
 
-	void INC();
+    void INC();
 
-	void INX();
+    void INX();
 
-	void INY();
+    void INY();
 
-	void JMP();
+    void JMP();
 
-	void JSR();
+    void JSR();
 
-	void LDA();
+    void LDA();
 
-	void LDX();
+    void LDX();
 
-	void LDY();
+    void LDY();
 
-	void LSR();
+    void LSR();
 
-	void NOP();
+    void NOP();
 
-	void ORA();
+    void ORA();
 
-	void PHA();
+    void PHA();
 
-	void PHP();
+    void PHP();
 
-	void PLA();
+    void PLA();
 
-	void PLP();
+    void PLP();
 
-	void ROL();
+    void ROL();
 
-	void ROR();
+    void ROR();
 
-	void RTI();
+    void RTI();
 
-	void RTS();
+    void RTS();
 
-	void SBC();
+    void SBC();
 
-	void SEC();
+    void SEC();
 
-	void SED();
+    void SED();
 
-	void SEI();
+    void SEI();
 
-	void STA();
+    void STA();
 
-	void STX();
+    void STX();
 
-	void STY();
+    void STY();
 
-	void TAX();
+    void TAX();
 
-	void TAY();
+    void TAY();
 
-	void TSX();
+    void TSX();
 
-	void TXA();
+    void TXA();
 
-	void TXS();
+    void TXS();
 
-	void TYA();
+    void TYA();
 
-	void INV();
+    void INV();
 
-	enum class AddressingMode
-	{
-		Absolute = 1,
-		AbsoluteX,
-		AbsoluteY,
-		Accumulator,
-		Immediate,
-		Implied,
-		IndexedIndirect,
-		Indirect,
-		IndirectIndexed,
-		Relative,
-		ZeroPage,
-		ZeroPageX,
-		ZeroPageY
-	};
+    enum class AddressingMode
+    {
+        Absolute = 1,
+        AbsoluteX,
+        AbsoluteY,
+        Accumulator,
+        Immediate,
+        Implied,
+        IndexedIndirect,
+        Indirect,
+        IndirectIndexed,
+        Relative,
+        ZeroPage,
+        ZeroPageX,
+        ZeroPageY
+    };
 
-	enum class InterruptType
-	{
-		None, NMI, IRQ
-	};
+    enum class InterruptType
+    {
+        None, NMI, IRQ
+    };
 
-	uint8_t m_A;
-	uint8_t m_X;
-	uint8_t m_Y;
-	uint16_t m_PC;
-	uint8_t m_SP;
-	uint8_t m_P;
+    uint8_t m_A;
+    uint8_t m_X;
+    uint8_t m_Y;
+    uint16_t m_PC;
+    uint8_t m_SP;
+    uint8_t m_P;
 
-	uint8_t m_Cycles;
-	uint8_t m_BranchCycles;
-	uint8_t m_OpCode;
-	AddressingMode m_Mode;
-	uint16_t m_Address;
-	InterruptType m_Interrupt;
+    uint8_t m_Cycles;
+    uint8_t m_BranchCycles;
+    uint8_t m_OpCode;
+    AddressingMode m_Mode;
+    uint16_t m_Address;
+    InterruptType m_Interrupt;
 
-	Console* m_Console;
+    Console* m_Console;
 
-	typedef void(CPU::*InstructionFunction)();
-	const InstructionFunction m_kExecutionTable[256];
+    typedef void(CPU::*InstructionFunction)();
+    const InstructionFunction m_kExecutionTable[256];
 };
 
 END_NES_EMULATOR_NAMESPACE
