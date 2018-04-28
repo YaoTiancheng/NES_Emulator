@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "CPU.h"
-#include "RAM.h"
+#include "Console.h"
 
 BEGIN_NES_EMULATOR_NAMESPACE
 
@@ -87,13 +87,50 @@ const uint8_t kInstructionPageCycles[] =
 	1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0,
 };
 
+const char* kInstructionNames[] =
+{
+	"BRK", "ORA", "KIL", "SLO", "NOP", "ORA", "ASL", "SLO",
+	"PHP", "ORA", "ASL", "ANC", "NOP", "ORA", "ASL", "SLO",
+	"BPL", "ORA", "KIL", "SLO", "NOP", "ORA", "ASL", "SLO",
+	"CLC", "ORA", "NOP", "SLO", "NOP", "ORA", "ASL", "SLO",
+	"JSR", "AND", "KIL", "RLA", "BIT", "AND", "ROL", "RLA",
+	"PLP", "AND", "ROL", "ANC", "BIT", "AND", "ROL", "RLA",
+	"BMI", "AND", "KIL", "RLA", "NOP", "AND", "ROL", "RLA",
+	"SEC", "AND", "NOP", "RLA", "NOP", "AND", "ROL", "RLA",
+	"RTI", "EOR", "KIL", "SRE", "NOP", "EOR", "LSR", "SRE",
+	"PHA", "EOR", "LSR", "ALR", "JMP", "EOR", "LSR", "SRE",
+	"BVC", "EOR", "KIL", "SRE", "NOP", "EOR", "LSR", "SRE",
+	"CLI", "EOR", "NOP", "SRE", "NOP", "EOR", "LSR", "SRE",
+	"RTS", "ADC", "KIL", "RRA", "NOP", "ADC", "ROR", "RRA",
+	"PLA", "ADC", "ROR", "ARR", "JMP", "ADC", "ROR", "RRA",
+	"BVS", "ADC", "KIL", "RRA", "NOP", "ADC", "ROR", "RRA",
+	"SEI", "ADC", "NOP", "RRA", "NOP", "ADC", "ROR", "RRA",
+	"NOP", "STA", "NOP", "SAX", "STY", "STA", "STX", "SAX",
+	"DEY", "NOP", "TXA", "XAA", "STY", "STA", "STX", "SAX",
+	"BCC", "STA", "KIL", "AHX", "STY", "STA", "STX", "SAX",
+	"TYA", "STA", "TXS", "TAS", "SHY", "STA", "SHX", "AHX",
+	"LDY", "LDA", "LDX", "LAX", "LDY", "LDA", "LDX", "LAX",
+	"TAY", "LDA", "TAX", "LAX", "LDY", "LDA", "LDX", "LAX",
+	"BCS", "LDA", "KIL", "LAX", "LDY", "LDA", "LDX", "LAX",
+	"CLV", "LDA", "TSX", "LAS", "LDY", "LDA", "LDX", "LAX",
+	"CPY", "CMP", "NOP", "DCP", "CPY", "CMP", "DEC", "DCP",
+	"INY", "CMP", "DEX", "AXS", "CPY", "CMP", "DEC", "DCP",
+	"BNE", "CMP", "KIL", "DCP", "NOP", "CMP", "DEC", "DCP",
+	"CLD", "CMP", "NOP", "DCP", "NOP", "CMP", "DEC", "DCP",
+	"CPX", "SBC", "NOP", "ISC", "CPX", "SBC", "INC", "ISC",
+	"INX", "SBC", "NOP", "SBC", "CPX", "SBC", "INC", "ISC",
+	"BEQ", "SBC", "KIL", "ISC", "NOP", "SBC", "INC", "ISC",
+	"SED", "SBC", "NOP", "ISC", "NOP", "SBC", "INC", "ISC",
+};
+
 inline bool ArePageDifferent(uint16_t address1, uint16_t address2)
 {
 	return (address1 & 0xFF00) != (address2 & 0xFF00);
 }
 
-CPU::CPU()
-	: m_kExecutionTable {
+CPU::CPU(Console* console)
+	: m_Console(console),
+	m_kExecutionTable {
 	&CPU::BRK, &CPU::ORA, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::ORA, &CPU::ASL, &CPU::INV,
 	&CPU::PHP, &CPU::ORA, &CPU::ASL, &CPU::INV, &CPU::NOP, &CPU::ORA, &CPU::ASL, &CPU::INV,
 	&CPU::BPL, &CPU::ORA, &CPU::INV, &CPU::INV, &CPU::NOP, &CPU::ORA, &CPU::ASL, &CPU::INV,
@@ -129,22 +166,25 @@ CPU::CPU()
 {
 }
 
-void CPU::Step()
+bool CPU::Step(char* statusStr)
 {
 	if (m_BranchCycles != 0)
 	{
 		m_BranchCycles--;
-		return;
+		return false;
 	}
 	else
 	{
 		m_Cycles--;
 		if (m_Cycles != 0)
-			return;
+			return false;
 	}
 
 	// Look-up and call the instruction function
 	(*this.*m_kExecutionTable[m_OpCode])();
+
+	if (statusStr != nullptr)
+		GetStatusStr(statusStr);
 
 	// Handle interrupt
 	switch (m_Interrupt)
@@ -163,12 +203,33 @@ void CPU::Step()
 	}
 	m_Interrupt = InterruptType::None;
 
-	FetchNextInstruction();
+	FetchNextOpCode();
+
+	return true;
 }
 
-void CPU::FetchNextInstruction()
+void CPU::Init(uint16_t PC)
 {
-	m_OpCode = m_RAM->Read(m_PC);
+	m_A = 0;
+	m_X = 0;
+	m_Y = 0;
+	m_PC = PC;
+	m_SP = 0xFF;
+	m_P = 0;
+	m_Cycles = 0;
+	m_BranchCycles = 0;
+}
+
+void CPU::GetStatusStr(char* str) const
+{
+	sprintf_s(str, kMaxStatusStrLength, "%s A=%-3d X=%-3d Y=%-3d PC=0x%04x SP=0x%02x N=%1d V=%1d B=%1d D=%1d I=%1d Z=%1d C=%1d\n", 
+		kInstructionNames[m_OpCode], m_A, m_X, m_Y, m_PC, m_SP, 
+		(m_P & 0x80) >> 7, (m_P & 0x40) >> 6, (m_P & 0x10) >> 4, (m_P & 0x08) >> 3, (m_P & 0x04) >> 2, (m_P & 0x02) >> 1, m_P & 0x01);
+}
+
+void CPU::FetchNextOpCode()
+{
+	m_OpCode = m_Console->Read(m_PC);
 	m_Mode = (AddressingMode)kInstructionModes[m_OpCode];
 	m_Address = 0;
 	bool pageCrossed = false;
@@ -195,33 +256,31 @@ void CPU::FetchNextInstruction()
 		m_Address = 0;
 		break;
 	case AddressingMode::IndexedIndirect:
-		m_Address = Read16Bug((uint16_t)m_RAM->Read(m_PC + 1) + m_X);
+		m_Address = Read16Bug((uint16_t)m_Console->Read(m_PC + 1) + m_X);
 		break;
 	case AddressingMode::Indirect:
 		m_Address = Read16Bug(Read16(m_PC + 1));
 		break;
 	case AddressingMode::IndirectIndexed:
-		m_Address = Read16Bug((uint16_t)m_RAM->Read(m_PC + 1)) + m_Y;
+		m_Address = Read16Bug((uint16_t)m_Console->Read(m_PC + 1)) + m_Y;
 		pageCrossed = ArePageDifferent(m_Address - m_Y, m_Address);
 		break;
 	case AddressingMode::Relative:
 	{
-		uint8_t offset = m_RAM->Read(m_PC + 1);
+		uint8_t offset = m_Console->Read(m_PC + 1);
 		m_Address = m_PC + 2 + offset;
-		// Subtract 0x100 if offset is negative.
-		// No idea why ...
 		if (offset >= 0x80u)
 			m_Address -= 0x100;
 		break;
 	}
 	case AddressingMode::ZeroPage:
-		m_Address = m_RAM->Read(m_PC + 1);
+		m_Address = m_Console->Read(m_PC + 1);
 		break;
 	case AddressingMode::ZeroPageX:
-		m_Address = (m_RAM->Read(m_PC + 1) + m_X) & 0xFF;
+		m_Address = (m_Console->Read(m_PC + 1) + m_X) & 0xFF;
 		break;
 	case AddressingMode::ZeroPageY:
-		m_Address = (m_RAM->Read(m_PC + 1) + m_Y) & 0xFF;
+		m_Address = (m_Console->Read(m_PC + 1) + m_Y) & 0xFF;
 		break;
 	default:
 		break;
@@ -242,15 +301,15 @@ void CPU::AddBranchCycles()
 
 uint16_t CPU::Read16(uint16_t address) const
 {
-	uint8_t lo = m_RAM->Read(m_Address);
-	uint8_t hi = m_RAM->Read(m_Address + 1);
+	uint8_t lo = m_Console->Read(address);
+	uint8_t hi = m_Console->Read(address + 1);
 	return uint16_t(hi) << 8 | lo;
 }
 
 uint16_t CPU::Read16Bug(uint16_t address) const
 {
-	uint8_t lo = m_RAM->Read(m_Address);
-	uint8_t hi = m_RAM->Read(m_Address & 0xFF00 | uint8_t(m_Address) + 1);
+	uint8_t lo = m_Console->Read(address);
+	uint8_t hi = m_Console->Read(address & 0xFF00 | uint8_t(address) + 1);
 	return uint16_t(hi) << 8 | lo;
 }
 
@@ -264,7 +323,7 @@ inline void CPU::Push16(uint16_t value)
 
 inline void CPU::Push(uint8_t value)
 {
-	m_RAM->Write(0x0100 | m_SP, value);
+	m_Console->Write(0x0100 | m_SP, value);
 	m_SP--;
 }
 
@@ -277,7 +336,7 @@ inline uint16_t CPU::Pull16()
 
 inline uint8_t CPU::Pull()
 {
-	uint8_t value = m_RAM->Read(0x0100 | m_SP);
+	uint8_t value = m_Console->Read(0x0100 | m_SP);
 	m_SP++;
 	return value;
 }
@@ -296,7 +355,7 @@ inline void CPU::SetN(uint8_t value)
 // Set negative flag if value is negative.
 inline void CPU::SetZN(uint8_t value)
 {
-	m_P = m_P & ~0x02 | (value == 0 ? 0x00 : 0x02);
+	m_P = m_P & ~0x02 | (value == 0 ? 0x02 : 0x00);
 	m_P = m_P & ~0x80 | value & 0x80;
 }
 
@@ -334,7 +393,7 @@ void CPU::IRQInterrupt()
 void CPU::ADC()
 {
 	uint16_t a = m_A;
-	uint16_t b = m_RAM->Read(m_Address);
+	uint16_t b = m_Console->Read(m_Address);
 	uint16_t c = m_P & 0x01;
 	uint16_t sum = a + b + c;
 	m_A = (uint8_t)sum;
@@ -348,7 +407,7 @@ void CPU::ADC()
 // AND - Logical AND
 void CPU::AND()
 {
-	m_A = m_A & m_RAM->Read(m_Address);
+	m_A = m_A & m_Console->Read(m_Address);
 	SetZN(m_A);
 }
 
@@ -364,11 +423,11 @@ void CPU::ASL()
 	}
 	else
 	{
-		uint8_t value = m_RAM->Read(m_Address);
+		uint8_t value = m_Console->Read(m_Address);
 		// Set carry flag if MSB is 1
 		m_P = m_P & ~0x01 | value >> 7;
 		value <<= 1;
-		m_RAM->Write(m_Address, value);
+		m_Console->Write(m_Address, value);
 		SetZN(value);
 	}
 }
@@ -406,7 +465,7 @@ void CPU::BEQ()
 // BIT - Bit test
 void CPU::BIT()
 {
-	uint8_t value = m_RAM->Read(m_Address);
+	uint8_t value = m_Console->Read(m_Address);
 	// Bits 7 and 6 of operand are transfered to bit 7 and 6 of status flags
 	m_P = m_P & ~0xC0 | value & 0xC0;
 	SetZ(value & m_A);
@@ -501,29 +560,29 @@ void CPU::CLV()
 // CMP - Compare
 void CPU::CMP()
 {
-	uint8_t value = m_RAM->Read(m_Address);
+	uint8_t value = m_Console->Read(m_Address);
 	Compare(m_A, value);
 }
 
 // CPX - Compare X register
 void CPU::CPX()
 {
-	uint8_t value = m_RAM->Read(m_Address);
+	uint8_t value = m_Console->Read(m_Address);
 	Compare(m_X, value);
 }
 
 // CPY - Compare Y register
 void CPU::CPY()
 {
-	uint8_t value = m_RAM->Read(m_Address);
+	uint8_t value = m_Console->Read(m_Address);
 	Compare(m_Y, value);
 }
 
 // DEC - Decrement memory
 void CPU::DEC()
 {
-	uint8_t value = m_RAM->Read(m_Address) - 1;
-	m_RAM->Write(m_Address, value);
+	uint8_t value = m_Console->Read(m_Address) - 1;
+	m_Console->Write(m_Address, value);
 	SetZN(value);
 }
 
@@ -544,15 +603,15 @@ void CPU::DEY()
 // EOR - Exclusive or
 void CPU::EOR()
 {
-	m_A = m_A ^ m_RAM->Read(m_Address);
+	m_A = m_A ^ m_Console->Read(m_Address);
 	SetZN(m_A);
 }
 
 // INC - Increment memory
 void CPU::INC()
 {
-	uint8_t value = m_RAM->Read(m_Address) + 1;
-	m_RAM->Write(m_Address, value);
+	uint8_t value = m_Console->Read(m_Address) + 1;
+	m_Console->Write(m_Address, value);
 	SetZN(value);
 }
 
@@ -586,21 +645,21 @@ void CPU::JSR()
 // LDA - Load accumulator
 void CPU::LDA()
 {
-	m_A = m_RAM->Read(m_Address);
+	m_A = m_Console->Read(m_Address);
 	SetZN(m_A);
 }
 
 // LDX - Load register x
 void CPU::LDX()
 {
-	m_X = m_RAM->Read(m_Address);
+	m_X = m_Console->Read(m_Address);
 	SetZN(m_X);
 }
 
 // LDY - Load register y
 void CPU::LDY()
 {
-	m_Y = m_RAM->Read(m_Address);
+	m_Y = m_Console->Read(m_Address);
 	SetZN(m_Y);
 }
 
@@ -616,12 +675,12 @@ void CPU::LSR()
 	}
 	else
 	{
-		uint8_t value = m_RAM->Read(m_Address);
+		uint8_t value = m_Console->Read(m_Address);
 		// Shift bit 0 to carry flag
 		m_P = m_P & 0xFE | value & 0x01;
 		value >>= 1;
 		SetZN(value);
-		m_RAM->Write(m_Address, value);
+		m_Console->Write(m_Address, value);
 	}
 }
 
@@ -633,7 +692,7 @@ void CPU::NOP()
 // ORA - Inclusive or with accumulator
 void CPU::ORA()
 {
-	m_A |= m_RAM->Read(m_Address);
+	m_A |= m_Console->Read(m_Address);
 	SetZN(m_A);
 }
 
@@ -677,13 +736,13 @@ void CPU::ROL()
 	}
 	else
 	{
-		uint8_t value = m_RAM->Read(m_Address);
+		uint8_t value = m_Console->Read(m_Address);
 		uint8_t c = m_P & 0x01;
 		m_P = m_P & 0xFE | value >> 7;
 		value <<= 1;
 		value |= c;
 		SetZN(value);
-		m_RAM->Write(m_Address, value);
+		m_Console->Write(m_Address, value);
 	}
 }
 
@@ -700,13 +759,13 @@ void CPU::ROR()
 	}
 	else
 	{
-		uint8_t value = m_RAM->Read(m_Address);
+		uint8_t value = m_Console->Read(m_Address);
 		uint8_t c = m_P & 0x01;
 		m_P = m_P & 0xFE | value & 0x01;
 		value >>= 1;
 		value |= c << 7;
 		SetZN(value);
-		m_RAM->Write(m_Address, value);
+		m_Console->Write(m_Address, value);
 	}
 }
 
@@ -728,7 +787,7 @@ void CPU::SBC()
 {
 	// Copy accumulator value and set bit 8
 	uint16_t a = m_A | 0x0100;
-	uint16_t b = m_RAM->Read(m_Address);
+	uint16_t b = m_Console->Read(m_Address);
 	uint16_t c = m_P & 0x01;
 	uint16_t sub = a - b - (1 - c);
 	m_A = uint8_t(sub);
@@ -760,19 +819,19 @@ void CPU::SEI()
 // STA - Store accumulator
 void CPU::STA()
 {
-	m_RAM->Write(m_Address, m_A);
+	m_Console->Write(m_Address, m_A);
 }
 
 // STX - Store register X
 void CPU::STX()
 {
-	m_RAM->Write(m_Address, m_X);
+	m_Console->Write(m_Address, m_X);
 }
 
 // STY - Store register Y
 void CPU::STY()
 {
-	m_RAM->Write(m_Address, m_Y);
+	m_Console->Write(m_Address, m_Y);
 }
 
 // TAX - Transfer accumulator to register X

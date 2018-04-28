@@ -2,19 +2,25 @@
 
 BEGIN_NES_EMULATOR_NAMESPACE
 
-class RAM;
+class Console;
 
 class CPU
 {
 public:
 
-	CPU();
+	static const uint32_t kMaxStatusStrLength = 256;
 
-	void Step();
+	CPU(Console* console);
+
+	bool Step(char* statusStr = nullptr);
+
+	void Init(uint16_t PC);
+
+	void GetStatusStr(char* str) const;
+
+	void FetchNextOpCode();
 
 private:
-
-	void FetchNextInstruction();
 
 	void AddBranchCycles();
 
@@ -192,7 +198,7 @@ private:
 	uint16_t m_Address;
 	InterruptType m_Interrupt;
 
-	RAM* m_RAM;
+	Console* m_Console;
 
 	typedef void(CPU::*InstructionFunction)();
 	const InstructionFunction m_kExecutionTable[256];
