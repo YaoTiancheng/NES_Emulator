@@ -401,7 +401,7 @@ void CPU::ADC()
     // Set carry flag if sum results a carry
     m_P = m_P & ~0x01 | sum >> 8;
     // Set overflow flag if sum results an overflow
-    m_P = m_P & ~0x40 | ((~(a ^ b)) & (a ^ c) & 0x80u) >> 1;
+    m_P = m_P & ~0x40 | ((a ^ sum) & (b ^ sum) & 0x80) >> 1;
 }
 
 // AND - Logical AND
@@ -785,17 +785,19 @@ void CPU::RTS()
 // SBC - Subtract with carry
 void CPU::SBC()
 {
-    // Copy accumulator value and set bit 8
-    uint16_t a = m_A | 0x0100;
-    uint16_t b = m_Console->Read(m_Address);
+    // Subtraction is implemented the same as ADC with only one difference is that
+    // the ones-complement of number b is added to register A.
+    uint16_t a = m_A;
+    // Mask out the higher 8 bits since integer promotion will cause zero extending happens before bit flipping.
+    uint16_t b = ~m_Console->Read(m_Address) & 0x00FF;
     uint16_t c = m_P & 0x01;
-    uint16_t sub = a - b - (1 - c);
+    uint16_t sub = a + b + c;
     m_A = uint8_t(sub);
     SetZN(m_A);
-    // Set carry flag if sum results a carry
+    // Set carry flag if sub results a carry
     m_P = m_P & ~0x01 | sub >> 8;
-    // Set overflow flag if sum results an overflow
-    m_P = m_P & ~0x40 | ((~(a ^ b)) & (a ^ c) & 0x80u) >> 1;
+    // Set overflow flag if sub results an overflow
+    m_P = m_P & ~0x40 | ((a ^ sub) & (b ^ sub) & 0x80) >> 1;
 }
 
 // SEC - Set carry flag
